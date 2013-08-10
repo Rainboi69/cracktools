@@ -1,8 +1,32 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 #include <assert.h>
+#include <algorithm>
 #include "process.h"
+
+exitstatus::exitstatus(int s) : status(s) {}
+
+bool exitstatus::running() const {
+    return !(WIFEXITED(status) || WIFSIGNALED(status));
+}
+
+bool exitstatus::exited() const {
+    return WIFEXITED(status);
+}
+
+bool exitstatus::terminated() const {
+    return WIFSIGNALED(status);
+}
+
+int exitstatus::returnval() const {
+    return WEXITSTATUS(status);
+}
+
+int exitstatus::termsig() const {
+    return WTERMSIG(status);
+}
 
 void process::init(process::flags settings) {
     int inp[2]{-1, -1}, outp[2]{-1, -1}, errp[2]{-1, -1};
@@ -21,11 +45,12 @@ void process::init(process::flags settings) {
             perror("pipe");
         }
     }
-    pid = fork();
-    if (pid == -1) {
+    launch = clock::now();
+    pid_m = fork();
+    if (pid_m == -1) {
         perror("fork");
     }
-    else if (pid == 0) {
+    else if (pid_m == 0) {
         //child
         if (settings & flags::redir_in) {
             dup2(inp[0], STDIN_FILENO);
@@ -39,41 +64,86 @@ void process::init(process::flags settings) {
     }
     else {
         //parent
-        in = inp[1];
-        out = outp[0];
-        err = errp[0];
+        in_fd = inp[1];
+        out_fd = outp[0];
+        err_fd = errp[0];
     }
 }
 
 process::process(char** args, process::flags f) {
     init(f);
-    if (pid == 0) { //child
+    if (pid_m == 0) { //child
         execvp(args[0], args);
         perror("execvp");
         std::exit(1);
     }
 }
 
-static int wait_return(int status) {
-    if (WIFEXITED(status)) {
-        return WEXITSTATUS(status);
-    }
-    if (WIFSIGNALED(status)) {
-        return -WTERMSIG(status);
-    }
-    assert(false);
-    return 0;
+process::process(process&& p) {
+    swap(p);
 }
 
-int process::wait() {
-    int status;
-    waitpid(pid, &status, 0);
-    return wait_return(status);
+process::~process() {
+    if (in_fd != -1) {
+        close(in_fd);
+    }
+    if (out_fd != -1) {
+        close(out_fd);
+    }
+    if (err_fd != -1) {
+        close(err_fd);
+    }
 }
 
-bool process::wait_noblock(int* out) {
+void process::swap(process& p) {
+    std::swap(in_fd, p.in_fd);
+    std::swap(out_fd, p.out_fd);
+    std::swap(err_fd, p.err_fd);
+    std::swap(pid_m, p.pid_m);
+}
+
+exitstatus process::wait() {
     int status;
-    bool ret = waitpid(pid, &status, WNOHANG) == pid;
-    if (out) *out = wait_return(status);
-    return ret;
+    waitpid(pid_m, &status, 0);
+    return exitstatus{status};
+}
+
+exitstatus process::wait_noblock() {
+    int status;
+    waitpid(pid_m, &status, WNOHANG);
+    return exitstatus{status};
+}
+
+int process::in() {
+    return in_fd;
+}
+
+int process::out() {
+    return out_fd;
+}
+
+int process::err() {
+    return err_fd;
+}
+
+pid_t process::pid() const {
+    return pid_m;
+}
+
+process::time process::launchtime() const {
+    return launch;
+}
+
+void process::term() {
+    ::kill(pid_m, SIGTERM);
+}
+
+void process::kill() {
+    ::kill(pid_m, SIGKILL);
+}
+
+wait_t wait() {
+    int status;
+    pid_t pid = wait(&status);
+    return {pid, exitstatus{status}};
 }

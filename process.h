@@ -3,10 +3,24 @@
 
 #include <unistd.h>
 #include <cstdlib>
+#include <chrono>
 
+class exitstatus {
+public:
+    explicit exitstatus(int);
+    bool running() const;
+    bool exited() const;
+    bool terminated() const;
+    int returnval() const;
+    int termsig() const;
+private:
+    int status;
+};
 
 class process {
 public:
+    typedef std::chrono::system_clock clock;
+    typedef clock::time_point time;
     enum flags {
         null = 0,
         redir_in = 1 << 0,
@@ -17,19 +31,43 @@ public:
     template <class Callable>
     process(Callable c, flags f = null) {
         init(f);
-        if (pid == 0) {
+        if (pid_m == 0) {
             c();
             std::exit(0);
         }
     }
-    int wait();
-    bool wait_noblock(int*);
+    process(process&&);
+    ~process();
+    exitstatus wait();
+    exitstatus wait_noblock();
+    int in();
+    int out();
+    int err();
+    pid_t pid() const;
+    void term();
+    void kill();
+    void swap(process&);
+    time launchtime() const;
 private:
     void init(flags);
-    int in;
-    int out;
-    int err;
-    pid_t pid;
+    int in_fd;
+    int out_fd;
+    int err_fd;
+    pid_t pid_m;
+    time launch;
 };
+
+//allow enum to be or'd with strong typing
+static inline process::flags operator|(process::flags a, process::flags b) {
+    return (process::flags)((int)a | (int)b);
+}
+
+//nicer wrapper for wait
+struct wait_t {
+    pid_t pid;
+    exitstatus status;
+};
+
+wait_t wait();
 
 #endif

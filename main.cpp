@@ -1,82 +1,69 @@
 #include <iostream>
 #include <unistd.h>
-#include <getopt.h>
 #include <assert.h>
+#include <vector>
+#include <chrono>
+#include <algorithm>
 
 #include "process.h"
+#include "opts.h"
 
-bool trycrack(process p) {
-    //
-}
+//TODO:  Find out why std::find doesn't work (fuckton of compile errors)
+//TODO:  Find out why need to explicitly qualify with ::find to use global find
+//       (std::find is potential overload for find() w/o using namespace std;)
+//
 
-struct settings_t {
-    const char* progname = nullptr;
-    char ** child_cmd = nullptr;
-    const char* stdin_prepend = nullptr;
-    bool verbose = false;
-    unsigned long timeout = 5;
-} settings;
-
-const char * shortopts = "s:vht:";
-
-const struct option longopts[] = {
-    { "stdin", required_argument, NULL, 's' },
-    { "help", no_argument, NULL, 'h' },
-    { "verbose", no_argument, NULL, 'v' },
-    { "timeout", required_argument, NULL, 't' },
-    { NULL, no_argument, NULL, 0}
-};
-
-
-void help() {
-    std::cerr << "help\n";
-}
-
-void process_args(int argc, char** argv) {
-    settings.progname = argv[0];
-    int idx, opt;
-    while ((opt = getopt_long(argc, argv, shortopts, longopts, &idx)) != -1)  {
-        switch (opt) {
-        case 'h':
-            help();
-            exit(0);
-        case 's':
-            settings.stdin_prepend = optarg;
-            break;
-        case 'v':
-            settings.verbose = true;
-            break;
-        case 't':
-            {
-                char * errptr;
-                auto t = strtol(optarg, &errptr, 10);
-                if (t <= 0 || optarg == errptr) {
-                    std::cerr << "Invalid argument for timeout: " << optarg 
-                              << '\n';
-                    std::exit(1);
-                }
-                settings.timeout = t;
-            }
-        case '?':
-            //error will be printed by getopt
-            std::exit(1);
-            break;
-        default:
-            assert(false);
+template <class It, class Predicate>
+It find(It begin, It end, Predicate p) {
+    while (begin != end) {
+        if (p(*begin)) {
             break;
         }
+        ++begin;
     }
-    if (optind == argc) {
-        std::cerr << "No child process command given.\n";
-        exit(1);
+    return begin;
+}
+
+bool process_live(const process& p) {
+    using std::chrono::milliseconds;
+    using std::chrono::duration_cast;
+    auto time = process::clock::now() - p.launchtime();
+    return duration_cast<milliseconds>(time).count() > settings.timeout;
+}
+
+bool trycrack(char** program) {
+    std::vector<process> procvec;
+    for (int i = 0; i < settings.num_procs; ++i) {
+        procvec.emplace_back(program, process::redir_in | process::redir_out);
     }
-    settings.child_cmd = &(argv[optind]);
+    auto time = std::chrono::milliseconds{settings.timeout};
+    while (true) {
+        auto w = wait();
+        if (w.pid == -1) {
+            if (errno == EINTR) {
+                continue; //alarm signal - check process times
+            }
+            std::perror("wait");
+            std::exit(1);
+        }
+        auto it = ::find(begin(procvec), end(procvec),
+                [w](const process& p) { return p.pid() == w.pid; });
+        if (it == end(procvec)) {
+            std::cerr << "unsupervised child process\n";
+            continue;
+        }
+        process p{program, process::redir_in | process::redir_out};
+        it->swap(p);
+        auto live = ::find(begin(procvec), end(procvec), process_live);
+        if (live != end(procvec)) {
+            //viable process found *live!
+        }
+    }
+    return true;
 }
 
 int main(int argc, char** argv) {
     process_args(argc, argv);
-    process child(settings.child_cmd);
-    child.wait();
     return 0;
 }
 
