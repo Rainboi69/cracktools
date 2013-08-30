@@ -19,7 +19,26 @@ const option longopts[] = {
 };
 
 void help() {
-    std::cerr << "help\n";
+    std::cerr << "Usage: "
+        << settings.progname << " [OPTION]... -- [CMD]\n"
+        << "Attempt to brute force [CMD]\n"
+        "\n"
+        "Mandatory arguments for long options are mandatory for short options"
+                " too.\n"
+        "   -s, --stdin=FILE   Prepend the contents of FILE to each "
+                "subprocess'\n"
+        "                      standard input stream.\n"
+        "   -h, --help         Display this message.\n"
+        "   -v, --verbose(=N)  Enable verbose logging at level N (N=1 by "
+                "default).\n"
+        "   -t, --timeout=T    Consider a process live after it has survived"
+                " for T\n"
+        "                      ms without crashing.\n"
+        "   -n, --numprocs=N   Spawn N subprocesses at a time.\n"
+        "\n"
+        "Report bugs or suggest improvements at "
+                "<https://github.com/rbmj/cracktools>\n"
+        "";
 }
 
 void process_args(int argc, char** argv) {
