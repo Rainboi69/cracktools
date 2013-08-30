@@ -28,6 +28,7 @@ int exitstatus::termsig() const {
     return WTERMSIG(status);
 }
 
+
 void process::init(process::flags settings) {
     int inp[2]{-1, -1}, outp[2]{-1, -1}, errp[2]{-1, -1};
     if (settings & flags::redir_in) {
@@ -65,8 +66,11 @@ void process::init(process::flags settings) {
     else {
         //parent
         in_fd = inp[1];
+        close(inp[0]);
         out_fd = outp[0];
+        close(outp[1]);
         err_fd = errp[0];
+        close(errp[1]);
     }
 }
 
@@ -100,6 +104,7 @@ void process::swap(process& p) {
     std::swap(out_fd, p.out_fd);
     std::swap(err_fd, p.err_fd);
     std::swap(pid_m, p.pid_m);
+    std::swap(launch, p.launch);
 }
 
 exitstatus process::wait() {

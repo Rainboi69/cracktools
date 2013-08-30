@@ -5,7 +5,7 @@ extern struct settings_t {
     const char* progname = nullptr;
     char ** child_cmd = nullptr;
     const char* stdin_prepend = nullptr;
-    bool verbose = false;
+    unsigned verbose = 0;
     unsigned long timeout = 5;
     unsigned long num_procs = 5;
 } settings;

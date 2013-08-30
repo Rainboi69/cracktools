@@ -7,12 +7,12 @@
 
 settings_t settings; //allocate space in this translation unit
 
-const char * shortopts = "s:vht:n:";
+const char * shortopts = "s:v::ht:n:";
 
 const option longopts[] = {
     { "stdin", required_argument, NULL, 's' },
     { "help", no_argument, NULL, 'h' },
-    { "verbose", no_argument, NULL, 'v' },
+    { "verbose", optional_argument, NULL, 'v' },
     { "timeout", required_argument, NULL, 't' },
     { "numprocs", required_argument, NULL, 'n' },
     { NULL, no_argument, NULL, 0}
@@ -34,7 +34,19 @@ void process_args(int argc, char** argv) {
             settings.stdin_prepend = optarg;
             break;
         case 'v':
-            settings.verbose = true;
+            if (optarg) {
+                char * errptr;
+                auto n = strtol(optarg, &errptr, 10);
+                if (n <= 0 || optarg == errptr) {
+                    std::cerr << "Invalid argument for verbose: " << optarg 
+                              << '\n';
+                    std::exit(1);
+                }
+                settings.verbose = n;
+            }
+            else {
+                settings.verbose = 1;
+            }
             break;
         case 'n':
             {
