@@ -85,14 +85,17 @@ process::process(char** args, process::flags f) {
 }
 
 process::process(process&& p) {
-    swap(p);
+    swap(p); //be careful - destructor for p still gets called, even though
+             //the object we're swapping in is invalid.
 }
 
 process::~process() {
-    /* Even though we theoretically should never have to close fds when
-     * pid == 0, for some reason std::vector tries to destruct unconstructed
-     * elements, so keep this in for a sanity check to keep bugs from popping
-     * up (e.g., closing stdin)
+    /* We guard this in if (pid()) {} because if we constructed another object
+     * by moving *this, then we will be zeroed out.  If pid == 0 then this is
+     * either the child process (in which the parent's fds should be closed
+     * and we shouldn't worry about this) OR we move constructed an object from
+     * *this, in which case it effectively zeroed-out the object and we do NOT
+     * want to close standard input accidentally!
      */
     if (pid()) {
         clog(1) << "Destroying process handler for pid " << pid() << '\n';
