@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <algorithm>
 #include "process.h"
+#include "log.h"
 
 exitstatus::exitstatus(int s) : status(s) {}
 
@@ -88,14 +89,25 @@ process::process(process&& p) {
 }
 
 process::~process() {
-    if (in_fd != -1) {
-        close(in_fd);
-    }
-    if (out_fd != -1) {
-        close(out_fd);
-    }
-    if (err_fd != -1) {
-        close(err_fd);
+    /* Even though we theoretically should never have to close fds when
+     * pid == 0, for some reason std::vector tries to destruct unconstructed
+     * elements, so keep this in for a sanity check to keep bugs from popping
+     * up (e.g., closing stdin)
+     */
+    if (pid()) {
+        clog(1) << "Destroying process handler for pid " << pid() << '\n';
+        if (in_fd != -1) {
+            close(in_fd);
+            in_fd = -1;
+        }
+        if (out_fd != -1) {
+            close(out_fd);
+            out_fd = -1;
+        }
+        if (err_fd != -1) {
+            close(err_fd);
+            err_fd = -1;
+        }
     }
 }
 

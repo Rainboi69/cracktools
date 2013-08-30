@@ -10,22 +10,6 @@
 #include "opts.h"
 #include "log.h"
 
-//TODO:  Find out why std::find doesn't work (fuckton of compile errors)
-//TODO:  Find out why need to explicitly qualify with ::find to use global find
-//       (std::find is potential overload for find() w/o using namespace std;)
-//
-
-template <class It, class Predicate>
-It find(It begin, It end, Predicate p) {
-    while (begin != end) {
-        if (p(*begin)) {
-            break;
-        }
-        ++begin;
-    }
-    return begin;
-}
-
 bool process_live(const process& p) {
     using std::chrono::milliseconds;
     using std::chrono::duration_cast;
@@ -53,7 +37,7 @@ bool trycrack(char** program) {
         }
         clog(1) << "Child exited with pid " << w.pid << '\n';
         auto pid_match = [w](const process& p) { return p.pid() == w.pid; };
-        auto it = ::find(begin(procvec), end(procvec), pid_match);
+        auto it = std::find_if(begin(procvec), end(procvec), pid_match);
         if (it == end(procvec)) {
             std::cerr << "unsupervised child process\n";
             continue;
@@ -61,7 +45,7 @@ bool trycrack(char** program) {
         process p{program, process::redir_in | process::redir_out};
         it->swap(p);
         clog(1) << "Spawned process with pid " << it->pid() << '\n';
-        auto live = ::find(std::begin(procvec), std::end(procvec), 
+        auto live = std::find_if(std::begin(procvec), std::end(procvec), 
                 process_live);
         if (live != end(procvec)) {
             //viable process found *live!
@@ -77,6 +61,7 @@ bool trycrack(char** program) {
             }
             //connect the consoles
             passthrough(STDIN_FILENO, STDOUT_FILENO, proc.in(), proc.out());
+            break;
         }
     }
     return true;

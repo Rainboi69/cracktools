@@ -23,7 +23,7 @@ bool manual_splice(int in, int out) {
     char buf[512];
     int numbytes = read(in, buf, sizeof(buf));
     if (numbytes == 0) {
-        //parent stdin EOF
+        //EOF or closed socket...
         return false;
     }
     if (numbytes == -1) {
@@ -39,15 +39,19 @@ bool manual_splice(int in, int out) {
     
 
 void passthrough(int pin, int pout, int cin, int cout) {
-    fd_set rfds;
+    fd_set rfds, fds;
     char buf[1024];
     int nfds = ((pin > cout) ? pin : cout) + 1;
+    FD_ZERO(&fds);
+    FD_SET(pin, &fds);
+    FD_SET(cout, &fds);
     while (true) {
-        //setup rfds
-        FD_ZERO(&rfds);
-        FD_SET(pin, &rfds);
-        FD_SET(cout, &rfds);
+        rfds = fds;
         int ret = select(nfds, &rfds, NULL, NULL, NULL);
+        if (ret == -1) {
+            perror("select");
+            std::exit(1);
+        }
         if (FD_ISSET(pin, &rfds)) {
             if (!manual_splice(pin, cin)) {
                 return;
