@@ -5,6 +5,7 @@
 
 class stdin_filler {
 public:
+    stdin_filler();
     explicit stdin_filler(const char*);
     ~stdin_filler();
     void fill(process& p);

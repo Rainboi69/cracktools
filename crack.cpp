@@ -10,19 +10,29 @@
 #include "passthrough.h"
 #include "opts.h"
 
+stdin_filler::stdin_filler() : fd(-1) {
+    //pass
+}
+
 stdin_filler::stdin_filler(const char* file) {
-    fd = open(file, O_RDONLY);
-    if (fd == -1) {
-        std::perror("open");
-        std::exit(1);
+    if (!file) {
+        fd = -1; //no fd necessary - no file
+    }
+    else {
+        fd = open(file, O_RDONLY);
+        if (fd == -1) {
+            std::perror("open");
+            std::exit(1);
+        }
     }
 }
 
 stdin_filler::~stdin_filler() {
-    close(fd);
+    if (fd != -1) close(fd);
 }
 
 void stdin_filler::fill(process& p) {
+    if (fd == -1) return; //don't need to fill anything...
     char buf[512];
     int numbytes;
     do {

@@ -49,6 +49,10 @@ void passthrough(int pin, int pout, int cin, int cout) {
         rfds = fds;
         int ret = select(nfds, &rfds, NULL, NULL, NULL);
         if (ret == -1) {
+            if (errno == EINTR) {
+                //this could be because of a lingering SIGALRM, so continue
+                continue;
+            }
             perror("select");
             std::exit(1);
         }
