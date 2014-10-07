@@ -8,7 +8,3 @@ with CMake.
 
 If you can come up with a good name for brute, please suggest it!
 
-The reason that sash32 is included is to have a 32-bit standalone shell for
-running 32-bit exploits.
-
-
